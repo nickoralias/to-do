@@ -34,7 +34,8 @@ packages:
 # These entries can reference officially published versions as well as
 # forks / in-progress versions pinned to a git hash. For example:
 #
-# extra-deps:
+extra-deps:
+- MissingH-1.4.3.0@sha256:7136282773f7b3e7ce3af856b41dde98a04f9b03c51813c98d040fc060dcaa53,4650
 # - acme-missiles-0.3
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a

@@ -1,6 +1,18 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main (main) where
 
-import Options.Applicative hiding (infoParser)
+import           Control.Exception
+import           Data.Aeson hiding (Options)
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as BSL
+import           Data.String.Utils
+import qualified Data.Yaml as Yaml
+import           GHC.Generics
+import           Options.Applicative hiding (infoParser)
+import           System.Directory
+import           System.IO.Error
 
 type ItemIndex = Int
 type ItemTitle = String
@@ -8,12 +20,18 @@ type ItemDescription = Maybe String
 type ItemPriority = Maybe String
 type ItemDueBy = Maybe String
 
+data ToDoList = ToDoList [Item] deriving (Generic, Show)
+instance ToJSON ToDoList
+instance FromJSON ToDoList
+
 data Item = Item
     { title :: ItemTitle
     , description :: ItemDescription
     , priority :: ItemPriority
     , dueBy :: ItemDueBy
-    } deriving Show
+    } deriving (Generic, Show)
+instance ToJSON Item
+instance FromJSON Item
 
 data ItemUpdate = ItemUpdate
     { titleUpdate :: Maybe ItemTitle
@@ -136,7 +154,18 @@ itemDueByValueParser =
 main :: IO ()
 main = do
     Options dataPath command <- execParser (info (optionsParser) (progDesc "To-do list manager"))
-    run dataPath command
+
+    homeDir <- getHomeDirectory
+    let expandedDataPath = replace "~" homeDir dataPath
+
+    --run dataPath command
+
+    writeToDoList expandedDataPath $ ToDoList
+        [ Item "title1" (Just "description1") (Just "priority1") (Just "dueBy1")
+        , Item "title2" (Just "description2") (Just "priority2") (Just "dueBy2")
+        ]
+    toDoList <- readToDoList expandedDataPath
+    print toDoList
 
 run :: FilePath -> Command -> IO ()
 run dataPath Info = putStrLn "Info"
@@ -146,3 +175,16 @@ run dataPath (Add item) = putStrLn $ "Add: item=" ++ show item
 run dataPath (View idx) = putStrLn $ "View: idx=" ++ show idx
 run dataPath (Update idx itemUpdate) = putStrLn $ "Update: idx =" ++ show idx ++ " itemUpdate=" ++ show itemUpdate
 run dataPath (Remove idx) = putStrLn $ "Remove: idx=" ++ show idx
+
+writeToDoList :: FilePath -> ToDoList -> IO ()
+writeToDoList dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
+
+readToDoList :: FilePath -> IO ToDoList
+readToDoList dataPath = do
+    mbToDoList <- catchJust
+        (\e -> if isDoesNotExistError e then Just () else Nothing)
+        (BS.readFile dataPath >>= return . Yaml.decode)
+        (\_ -> return $ Just (ToDoList []))
+    case mbToDoList of
+        Nothing -> error "YAML file is corrupt"
+        Just toDoList -> return toDoList
